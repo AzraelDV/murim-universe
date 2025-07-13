@@ -15,10 +15,8 @@ const PlayerSetup: React.FC = () => {
     setError('');
 
     try {
-      const success = await initializePlayer(username.trim());
-      if (!success) {
-        setError('Failed to create player. Username might already be taken.');
-      }
+      await initializePlayer(username.trim());
+      // If we get here, the player was initialized successfully
     } catch (err) {
       setError('An error occurred while creating your player.');
     } finally {

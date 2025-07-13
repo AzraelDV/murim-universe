@@ -3,10 +3,12 @@ import { useAuth } from '../hooks/useAuth';
 import { useGame } from '../contexts/GameContext';
 import Game from './Game';
 import PlayerSetup from './PlayerSetup';
+import { useNavigate } from 'react-router-dom';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
-  const { player, loading, error } = useGame();
+  const { gameState, loading, error } = useGame();
+  const navigate = useNavigate();
 
   if (loading) {
     return (
@@ -25,13 +27,17 @@ const Dashboard: React.FC = () => {
   }
 
   // If user is authenticated but no player profile exists, show player setup
-  if (user && !player) {
+  if (user && !gameState.playerName) {
     return <PlayerSetup />;
   }
 
   // If player exists, show the main game interface
-  if (player) {
-    return <Game />;
+  if (gameState.playerName) {
+    return (
+      <div style={{ width: '100%' }}>
+        <Game />
+      </div>
+    );
   }
 
   // Fallback (shouldn't normally reach here)

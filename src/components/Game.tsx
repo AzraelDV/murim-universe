@@ -1,127 +1,123 @@
 import React, { useState } from 'react';
 import { useGame } from '../contexts/GameContext';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth } from '../contexts/AuthContext';
+import { MiningService } from '../lib/miningService';
 
 const Game: React.FC = () => {
   const { signOut } = useAuth();
-  const { 
-    player, 
-    currentLocation, 
-    locations, 
-    locationActions, 
-    loading, 
-    error,
-    moveToLocation,
-    performAction 
-  } = useGame();
+  const { gameState, loading, error, updateGameState } = useGame();
   
   const [actionInput, setActionInput] = useState('');
-  const [selectedLocation, setSelectedLocation] = useState('');
 
-  const handleMoveToLocation = async () => {
-    if (selectedLocation) {
-      const success = await moveToLocation(selectedLocation);
-      if (success) {
-        setSelectedLocation('');
-      }
-    }
+  const handleQuickAction = (actionType: string, description: string) => {
+    console.log(`${gameState.playerName} performs ${actionType}: ${description}`);
+    // For now, just log the action. In a real implementation, this would update the game state
   };
 
-  const handlePerformAction = async (e: React.FormEvent) => {
+  const handlePerformAction = (e: React.FormEvent) => {
     e.preventDefault();
     if (actionInput.trim()) {
-      const success = await performAction('custom', `${player?.username}: ${actionInput}`);
-      if (success) {
-        setActionInput('');
-      }
+      console.log(`${gameState.playerName}: ${actionInput}`);
+      setActionInput('');
     }
-  };
-
-  const handleQuickAction = async (actionType: string, description: string) => {
-    await performAction(actionType, description);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white">Loading game...</div>
+      <div style={{ color: 'white', textAlign: 'center', padding: '40px' }}>
+        Loading game...
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-red-400">Error: {error}</div>
+      <div style={{ color: 'red', textAlign: 'center', padding: '40px' }}>
+        Error: {error}
       </div>
     );
   }
 
-  if (!player) {
+  if (!gameState.playerName) {
     return (
-      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
-        <div className="text-white">No player data found</div>
+      <div style={{ color: 'white', textAlign: 'center', padding: '40px' }}>
+        No player data found
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-900 text-white">
+    <div style={{ color: 'white', width: '100%' }}>
       {/* Header */}
-      <div className="bg-gray-800 p-4 border-b border-gray-700">
-        <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-yellow-400">Murim Universe</h1>
+      <div style={{ background: '#2a2a2a', padding: '16px', borderBottom: '1px solid #444', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h1 style={{ fontSize: '24px', fontWeight: 'bold', color: '#ffd700' }}>Murim Universe</h1>
           <button
             onClick={signOut}
-            className="bg-red-600 hover:bg-red-700 px-4 py-2 rounded text-white"
+            style={{ background: '#dc2626', color: 'white', border: 'none', borderRadius: '4px', padding: '8px 16px', cursor: 'pointer' }}
           >
             Sign Out
           </button>
         </div>
       </div>
 
-      <div className="flex h-screen">
-        {/* Left Panel - Player Stats */}
-        <div className="w-1/4 bg-gray-800 p-4 border-r border-gray-700">
-          <div className="mb-6">
-            <h2 className="text-xl font-bold text-yellow-400 mb-4">Player Status</h2>
-            <div className="space-y-2">
-              <div><span className="text-gray-300">Name:</span> {player.username}</div>
-              <div><span className="text-gray-300">Level:</span> {player.level}</div>
-              <div><span className="text-gray-300">Experience:</span> {player.experience}</div>
-              <div><span className="text-gray-300">Health:</span> {player.health}/{player.max_health}</div>
-              <div><span className="text-gray-300">Energy:</span> {player.energy}/{player.max_energy}</div>
+      {/* Current Activity Display */}
+      {gameState.currentActivity && (
+        <div style={{ 
+          background: '#1a1a1a', 
+          padding: '12px 16px', 
+          borderRadius: '6px', 
+          marginBottom: '20px',
+          border: '1px solid #444',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px'
+        }}>
+          <span style={{ fontSize: '1.2rem' }}>🎯</span>
+          <div>
+            <div style={{ fontSize: '14px', fontWeight: '600', color: '#ffd700' }}>
+              Current Activity
+            </div>
+            <div style={{ fontSize: '12px', color: '#ccc' }}>
+              {gameState.currentActivity}
             </div>
           </div>
+        </div>
+      )}
 
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-yellow-400 mb-2">Attributes</h3>
-            <div className="space-y-1">
-              <div><span className="text-gray-300">Strength:</span> {player.strength}</div>
-              <div><span className="text-gray-300">Agility:</span> {player.agility}</div>
-              <div><span className="text-gray-300">Intelligence:</span> {player.intelligence}</div>
+      <div style={{ display: 'flex', gap: '20px', width: '100%' }}>
+        {/* Left Panel - Player Stats */}
+        <div style={{ width: '25%', background: '#2a2a2a', padding: '16px', borderRadius: '8px', border: '1px solid #444' }}>
+          <div style={{ marginBottom: '24px' }}>
+            <h2 style={{ fontSize: '20px', fontWeight: 'bold', color: '#ffd700', marginBottom: '16px' }}>Player Status</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div><span style={{ color: '#ccc' }}>Name:</span> {gameState.playerName}</div>
+              <div><span style={{ color: '#ccc' }}>Level:</span> {gameState.level}</div>
+              <div><span style={{ color: '#ccc' }}>Experience:</span> {gameState.experience}</div>
+              <div><span style={{ color: '#ccc' }}>Health:</span> {gameState.health}/{gameState.maxHealth}</div>
+              <div><span style={{ color: '#ccc' }}>Energy:</span> {gameState.energy}/{gameState.maxEnergy}</div>
             </div>
           </div>
 
           {/* Quick Actions */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-yellow-400 mb-2">Quick Actions</h3>
-            <div className="space-y-2">
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#ffd700', marginBottom: '8px' }}>Quick Actions</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <button
-                onClick={() => handleQuickAction('train', `${player.username} begins training`)}
-                className="w-full bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded text-sm"
+                onClick={() => handleQuickAction('train', `${gameState.playerName} begins training`)}
+                style={{ width: '100%', background: '#2563eb', color: 'white', border: 'none', borderRadius: '4px', padding: '8px 12px', cursor: 'pointer', fontSize: '14px' }}
               >
                 Train
               </button>
               <button
-                onClick={() => handleQuickAction('meditate', `${player.username} enters meditation`)}
-                className="w-full bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded text-sm"
+                onClick={() => handleQuickAction('meditate', `${gameState.playerName} enters meditation`)}
+                style={{ width: '100%', background: '#7c3aed', color: 'white', border: 'none', borderRadius: '4px', padding: '8px 12px', cursor: 'pointer', fontSize: '14px' }}
               >
                 Meditate
               </button>
               <button
-                onClick={() => handleQuickAction('rest', `${player.username} takes a rest`)}
-                className="w-full bg-green-600 hover:bg-green-700 px-3 py-2 rounded text-sm"
+                onClick={() => handleQuickAction('rest', `${gameState.playerName} takes a rest`)}
+                style={{ width: '100%', background: '#059669', color: 'white', border: 'none', borderRadius: '4px', padding: '8px 12px', cursor: 'pointer', fontSize: '14px' }}
               >
                 Rest
               </button>
@@ -130,50 +126,94 @@ const Game: React.FC = () => {
         </div>
 
         {/* Center Panel - Game World */}
-        <div className="flex-1 p-4">
+        <div style={{ flex: 1, padding: '16px', background: '#2a2a2a', borderRadius: '8px', border: '1px solid #444' }}>
           {/* Current Location */}
-          <div className="mb-6">
-            <h2 className="text-2xl font-bold text-yellow-400 mb-2">
-              {currentLocation?.name || 'Unknown Location'}
+          <div style={{ marginBottom: '24px' }}>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#ffd700', marginBottom: '8px' }}>
+              {gameState.currentAreaName || 'Mortal Realm'}
             </h2>
-            <p className="text-gray-300 mb-4">
-              {currentLocation?.description || 'No description available'}
+            <p style={{ color: '#ccc', marginBottom: '16px' }}>
+              {gameState.currentLocationName ? 
+                `You are currently at ${gameState.currentLocationName} in ${gameState.currentAreaName || 'the Mortal Realm'}.` :
+                'You find yourself in the bustling streets of the Mortal Realm. Cultivators and commoners alike walk these paths, each with their own destiny to fulfill.'
+              }
             </p>
           </div>
 
-          {/* Recent Actions */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-yellow-400 mb-3">Recent Activity</h3>
-            <div className="bg-gray-800 p-4 rounded-lg h-64 overflow-y-auto">
-              {locationActions.length === 0 ? (
-                <div className="text-gray-500 italic">No recent activity...</div>
-              ) : (
-                locationActions.map((action) => (
-                  <div key={action.id} className="mb-2 text-sm">
-                    <span className="text-gray-400">
-                      {new Date(action.created_at).toLocaleTimeString()}
-                    </span>{' '}
-                    <span className="text-white">{action.description}</span>
+          {/* Current Mining Action */}
+          {gameState.currentMiningAction && (
+            <div style={{ marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#ffd700', marginBottom: '12px' }}>🚧 Current Activity</h3>
+              <div style={{ background: '#1a1a1a', padding: '16px', borderRadius: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                  <span style={{ fontSize: '1.5rem' }}>
+                    {MiningService.getMaterialEmoji(gameState.currentMiningAction.material?.name || '')}
+                  </span>
+                  <div>
+                    <div style={{ fontSize: '16px', fontWeight: '600', color: '#ffd700' }}>
+                      Mining {gameState.currentMiningAction.material?.name}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#ccc' }}>
+                      at {gameState.currentMiningAction.location?.name}
+                    </div>
                   </div>
-                ))
-              )}
+                </div>
+                
+                <div style={{ marginBottom: '12px' }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    marginBottom: '4px',
+                    fontSize: '12px',
+                    color: '#ccc'
+                  }}>
+                    <span>Progress</span>
+                    <span>{MiningService.formatTimeRemaining(gameState.currentMiningAction.end_time)}</span>
+                  </div>
+                  <div style={{ 
+                    background: '#2a2a2a', 
+                    height: '8px', 
+                    borderRadius: '4px', 
+                    overflow: 'hidden'
+                  }}>
+                    <div style={{
+                      background: '#2563eb',
+                      height: '100%',
+                      width: `${MiningService.calculateProgress(gameState.currentMiningAction.start_time, gameState.currentMiningAction.end_time)}%`,
+                      transition: 'width 0.3s ease'
+                    }} />
+                  </div>
+                </div>
+                
+                <div style={{ fontSize: '11px', color: '#666' }}>
+                  Mining will automatically stop when the timer expires or your inventory is full.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Recent Actions */}
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#ffd700', marginBottom: '12px' }}>Recent Activity</h3>
+            <div style={{ background: '#1a1a1a', padding: '16px', borderRadius: '8px', height: '200px', overflowY: 'auto' }}>
+              <div style={{ color: '#666', fontStyle: 'italic' }}>No recent activity...</div>
             </div>
           </div>
 
           {/* Action Input */}
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-yellow-400 mb-2">Perform Action</h3>
-            <form onSubmit={handlePerformAction} className="flex gap-2">
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#ffd700', marginBottom: '8px' }}>Perform Action</h3>
+            <form onSubmit={handlePerformAction} style={{ display: 'flex', gap: '8px' }}>
               <input
                 type="text"
                 value={actionInput}
                 onChange={(e) => setActionInput(e.target.value)}
                 placeholder="Describe your action..."
-                className="flex-1 px-3 py-2 bg-gray-800 border border-gray-600 rounded text-white placeholder-gray-400 focus:outline-none focus:border-yellow-400"
+                style={{ flex: 1, padding: '8px 12px', background: '#1a1a1a', border: '1px solid #444', borderRadius: '4px', color: 'white' }}
               />
               <button
                 type="submit"
-                className="bg-yellow-600 hover:bg-yellow-700 px-4 py-2 rounded text-white"
+                style={{ background: '#ca8a04', color: 'white', border: 'none', borderRadius: '4px', padding: '8px 16px', cursor: 'pointer' }}
               >
                 Act
               </button>
@@ -182,40 +222,29 @@ const Game: React.FC = () => {
         </div>
 
         {/* Right Panel - Navigation */}
-        <div className="w-1/4 bg-gray-800 p-4 border-l border-gray-700">
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-yellow-400 mb-3">Available Locations</h3>
-            <div className="space-y-2">
-              <select
-                value={selectedLocation}
-                onChange={(e) => setSelectedLocation(e.target.value)}
-                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded text-white focus:outline-none focus:border-yellow-400"
-              >
-                <option value="">Select a location...</option>
-                {locations
-                  .filter(loc => loc.id !== currentLocation?.id)
-                  .map((location) => (
-                    <option key={location.id} value={location.id}>
-                      {location.name}
-                    </option>
-                  ))}
-              </select>
-              <button
-                onClick={handleMoveToLocation}
-                disabled={!selectedLocation}
-                className="w-full bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 disabled:cursor-not-allowed px-3 py-2 rounded text-white"
-              >
-                Travel
-              </button>
+        <div style={{ width: '25%', background: '#2a2a2a', padding: '16px', borderRadius: '8px', border: '1px solid #444' }}>
+          <div style={{ marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#ffd700', marginBottom: '12px' }}>Available Locations</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <div style={{ color: '#ccc', fontSize: '14px' }}>
+                <div>• Training Grounds</div>
+                <div>• Meditation Chamber</div>
+                <div>• Market District</div>
+                <div>• Cultivation Pavilion</div>
+              </div>
+              <p style={{ color: '#666', fontSize: '12px', marginTop: '8px' }}>
+                Location travel will be implemented in future updates.
+              </p>
             </div>
           </div>
 
           <div>
-            <h3 className="text-lg font-semibold text-yellow-400 mb-3">Current Location</h3>
-            <div className="bg-gray-700 p-3 rounded">
-              <div className="text-sm text-gray-300">
-                <div><span className="text-yellow-400">Type:</span> {currentLocation?.location_type}</div>
-                <div><span className="text-yellow-400">Players here:</span> Online</div>
+            <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#ffd700', marginBottom: '12px' }}>Current Location</h3>
+            <div style={{ background: '#1a1a1a', padding: '12px', borderRadius: '4px' }}>
+              <div style={{ fontSize: '14px', color: '#ccc' }}>
+                <div><span style={{ color: '#ffd700' }}>Area:</span> {gameState.currentAreaName || 'Mortal Realm'}</div>
+                <div><span style={{ color: '#ffd700' }}>Location:</span> {gameState.currentLocationName || 'Training Grounds'}</div>
+                <div><span style={{ color: '#ffd700' }}>Status:</span> <span style={{ color: '#059669' }}>Online</span></div>
               </div>
             </div>
           </div>

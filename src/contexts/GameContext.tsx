@@ -1,222 +1,276 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User } from '@supabase/supabase-js';
-import { GameService, Player, Location, GameAction } from '../lib/gameService';
-import { useAuth } from '../hooks/useAuth';
+import React, { createContext, useContext, useEffect, useState } from 'react';
+import { supabase } from '../lib/supabaseClient';
+import { useAuth } from './AuthContext';
+import { SkillsService } from '../lib/skillsService';
+import { MiningService, type MiningAction } from '../lib/miningService';
+
+interface GameState {
+  // Add your game state properties here
+  // For now, we'll start with basic player info
+  playerId: string | null;
+  playerName: string | null;
+  level: number;
+  experience: number;
+  health: number;
+  maxHealth: number;
+  energy: number;
+  maxEnergy: number;
+  currentLocationId: string | null;
+  currentLocationName: string | null;
+  currentAreaName: string | null;
+  currentMiningAction: MiningAction | null;
+  currentActivity: string | null;
+}
 
 interface GameContextType {
-  player: Player | null;
-  currentLocation: Location | null;
-  locations: Location[];
-  locationActions: GameAction[];
+  gameState: GameState;
   loading: boolean;
   error: string | null;
-  
-  // Actions
-  initializePlayer: (username: string) => Promise<boolean>;
-  moveToLocation: (locationId: string) => Promise<boolean>;
-  performAction: (actionType: string, description: string) => Promise<boolean>;
-  refreshLocationActions: () => Promise<void>;
+  initializePlayer: (playerName: string) => Promise<void>;
+  updateGameState: (updates: Partial<GameState>) => void;
+  updatePlayerLocation: (locationId: string, locationName: string, areaName: string) => Promise<void>;
+  updateMiningAction: (miningAction: MiningAction | null) => void;
+  updateCurrentActivity: (activity: string | null) => Promise<void>;
 }
 
 const GameContext = createContext<GameContextType | undefined>(undefined);
 
 export const useGame = () => {
   const context = useContext(GameContext);
-  if (!context) {
+  if (context === undefined) {
     throw new Error('useGame must be used within a GameProvider');
   }
   return context;
 };
 
-interface GameProviderProps {
-  children: ReactNode;
-}
+const initialGameState: GameState = {
+  playerId: null,
+  playerName: null,
+  level: 1,
+  experience: 0,
+  health: 100,
+  maxHealth: 100,
+  energy: 100,
+  maxEnergy: 100,
+  currentLocationId: null,
+  currentLocationName: null,
+  currentAreaName: null,
+  currentMiningAction: null,
+  currentActivity: null,
+};
 
-export const GameProvider: React.FC<GameProviderProps> = ({ children }) => {
+export const GameProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
-  const [player, setPlayer] = useState<Player | null>(null);
-  const [currentLocation, setCurrentLocation] = useState<Location | null>(null);
-  const [locations, setLocations] = useState<Location[]>([]);
-  const [locationActions, setLocationActions] = useState<GameAction[]>([]);
+  const [gameState, setGameState] = useState<GameState>(initialGameState);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize game data when user logs in
   useEffect(() => {
     if (user) {
-      loadGameData();
+      loadPlayerData();
     } else {
-      // Reset game state when user logs out
-      setPlayer(null);
-      setCurrentLocation(null);
-      setLocations([]);
-      setLocationActions([]);
+      setGameState(initialGameState);
     }
   }, [user]);
 
-  // Subscribe to real-time location updates
-  useEffect(() => {
-    if (currentLocation) {
-      const subscription = GameService.subscribeToLocationActions(
-        currentLocation.id,
-        (newAction: GameAction) => {
-          setLocationActions(prev => [newAction, ...prev.slice(0, 9)]);
-        }
-      );
-
-      return () => {
-        subscription.unsubscribe();
-      };
-    }
-  }, [currentLocation]);
-
-  const loadGameData = async () => {
+  const loadPlayerData = async () => {
     if (!user) return;
 
     setLoading(true);
     setError(null);
 
     try {
-      // Load player data
-      const playerData = await GameService.getPlayer(user.id);
-      setPlayer(playerData);
+      // Fetch player data from the database
+      const { data, error } = await supabase
+        .from('players')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
 
-      // Load all locations
-      const locationsData = await GameService.getLocations();
-      setLocations(locationsData);
+      if (error) throw error;
 
-      // Load current location if player exists
-      if (playerData?.current_location_id) {
-        const locationData = await GameService.getLocation(playerData.current_location_id);
-        setCurrentLocation(locationData);
+      if (data) {
+        // Player exists, load their data
+        // Load current mining action
+        const currentMiningAction = await MiningService.getCurrentMiningAction(data.id);
         
-        // Load recent actions for current location
-        if (locationData) {
-          const actionsData = await GameService.getLocationActions(locationData.id);
-          setLocationActions(actionsData);
-        }
+        setGameState({
+          playerId: data.id,
+          playerName: data.username,
+          level: data.level,
+          experience: data.experience,
+          health: data.health,
+          maxHealth: data.max_health,
+          energy: data.energy,
+          maxEnergy: data.max_energy,
+          currentLocationId: data.current_location_id,
+          currentLocationName: data.current_location_name,
+          currentAreaName: data.current_area_name,
+          currentMiningAction,
+          currentActivity: data.current_activity || null,
+        });
+      } else {
+        // No player record exists, reset to initial state
+        setGameState(initialGameState);
       }
     } catch (err) {
-      setError('Failed to load game data');
-      console.error('Error loading game data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load player data');
     } finally {
       setLoading(false);
     }
   };
 
-  const initializePlayer = async (username: string): Promise<boolean> => {
-    if (!user) return false;
+  const initializePlayer = async (playerName: string) => {
+    if (!user) throw new Error('User must be authenticated');
 
     setLoading(true);
     setError(null);
 
     try {
-      const newPlayer = await GameService.createPlayer(user, username);
-      if (newPlayer) {
-        setPlayer(newPlayer);
-        
-        // Load the starting location
-        if (newPlayer.current_location_id) {
-          const locationData = await GameService.getLocation(newPlayer.current_location_id);
-          setCurrentLocation(locationData);
-          
-          // Load recent actions for starting location
-          if (locationData) {
-            const actionsData = await GameService.getLocationActions(locationData.id);
-            setLocationActions(actionsData);
-          }
-        }
-        
-        // Log initial action
-        await GameService.logAction(
-          newPlayer.id,
-          'join',
-          `${username} has entered the world of cultivation`,
-          newPlayer.current_location_id || undefined
-        );
-        
-        return true;
-      }
-      return false;
+      // Create a new player record in the database
+      const { data, error } = await supabase
+        .from('players')
+        .insert({
+          id: user.id,
+          username: playerName,
+          level: 1,
+          experience: 0,
+          health: 100,
+          max_health: 100,
+          energy: 100,
+          max_energy: 100,
+          strength: 5,
+          dexterity: 5,
+          constitution: 5,
+          qi: 5,
+          wisdom: 5,
+          intellect: 5,
+          perception: 5,
+          charisma: 5,
+          current_location_id: null,
+          current_location_name: null,
+          current_area_name: null,
+          current_activity: null,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // Initialize player skills
+      await SkillsService.initializePlayerSkills(user.id);
+
+      // Update local state with the created player data
+      setGameState({
+        playerId: user.id,
+        playerName,
+        level: data.level,
+        experience: data.experience,
+        health: data.health,
+        maxHealth: data.max_health,
+        energy: data.energy,
+        maxEnergy: data.max_energy,
+        currentLocationId: data.current_location_id,
+        currentLocationName: data.current_location_name,
+        currentAreaName: data.current_area_name,
+        currentMiningAction: null, // New players won't have mining actions
+        currentActivity: null,
+      });
     } catch (err) {
-      setError('Failed to create player');
-      console.error('Error creating player:', err);
-      return false;
+      setError(err instanceof Error ? err.message : 'Failed to initialize player');
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  const moveToLocation = async (locationId: string): Promise<boolean> => {
-    if (!player) return false;
+  const updateGameState = (updates: Partial<GameState>) => {
+    setGameState(prev => ({ ...prev, ...updates }));
+  };
+
+  const updatePlayerLocation = async (locationId: string, locationName: string, areaName: string) => {
+    if (!user) throw new Error('User must be authenticated');
 
     setLoading(true);
     setError(null);
 
     try {
-      const success = await GameService.updatePlayerLocation(player.id, locationId);
-      if (success) {
-        const locationData = await GameService.getLocation(locationId);
-        if (locationData) {
-          setCurrentLocation(locationData);
-          setPlayer(prev => prev ? { ...prev, current_location_id: locationId } : null);
-          
-          // Load actions for new location
-          const actionsData = await GameService.getLocationActions(locationId);
-          setLocationActions(actionsData);
-          
-          // Log movement action
-          await GameService.logAction(
-            player.id,
-            'move',
-            `${player.username} arrived at ${locationData.name}`,
-            locationId
-          );
-        }
-        return true;
-      }
-      return false;
+      // Update the database
+      const { error } = await supabase
+        .from('players')
+        .update({ 
+          current_location_id: locationId,
+          current_location_name: locationName,
+          current_area_name: areaName,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setGameState(prev => ({
+        ...prev,
+        currentLocationId: locationId,
+        currentLocationName: locationName,
+        currentAreaName: areaName,
+      }));
     } catch (err) {
-      setError('Failed to move to location');
-      console.error('Error moving to location:', err);
-      return false;
+      setError(err instanceof Error ? err.message : 'Failed to update location');
+      throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  const performAction = async (actionType: string, description: string): Promise<boolean> => {
-    if (!player || !currentLocation) return false;
+  const updateMiningAction = (miningAction: MiningAction | null) => {
+    setGameState(prev => ({
+      ...prev,
+      currentMiningAction: miningAction,
+    }));
+  };
+
+  const updateCurrentActivity = async (activity: string | null) => {
+    if (!user) throw new Error('User must be authenticated');
+
+    setLoading(true);
+    setError(null);
 
     try {
-      const success = await GameService.logAction(
-        player.id,
-        actionType,
-        description,
-        currentLocation.id
-      );
-      
-      if (success) {
-        // The real-time subscription will handle updating the UI
-        return true;
-      }
-      return false;
+      // Update the database
+      const { error } = await supabase
+        .from('players')
+        .update({ 
+          current_activity: activity,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) throw error;
+
+      // Update local state
+      setGameState(prev => ({
+        ...prev,
+        currentActivity: activity,
+      }));
     } catch (err) {
-      setError('Failed to perform action');
-      console.error('Error performing action:', err);
-      return false;
+      setError(err instanceof Error ? err.message : 'Failed to update activity');
+      throw err;
+    } finally {
+      setLoading(false);
     }
   };
 
-  const refreshLocationActions = async () => {
-    if (!currentLocation) return;
-
-    try {
-      const actionsData = await GameService.getLocationActions(currentLocation.id);
-      setLocationActions(actionsData);
-    } catch (err) {
-      console.error('Error refreshing location actions:', err);
-    }
+  const value = {
+    gameState,
+    loading,
+    error,
+    initializePlayer,
+    updateGameState,
+    updatePlayerLocation,
+    updateMiningAction,
+    updateCurrentActivity,
   };
 
-  const value: GameCont
+  return <GameContext.Provider value={value}>{children}</GameContext.Provider>;
+};
