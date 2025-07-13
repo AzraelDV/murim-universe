@@ -3,12 +3,10 @@ import { useAuth } from '../hooks/useAuth';
 import { useGame } from '../contexts/GameContext';
 import Game from './Game';
 import PlayerSetup from './PlayerSetup';
-import { useNavigate } from 'react-router-dom';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const { gameState, loading, error } = useGame();
-  const navigate = useNavigate();
 
   if (loading) {
     return (

@@ -32,3 +32,4 @@ dist-ssr
 
 # SQL files (stored in Supabase)
 *.sql
+.vercel

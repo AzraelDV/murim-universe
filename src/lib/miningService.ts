@@ -210,7 +210,7 @@ export class MiningService {
   static async getCurrentMiningAction(playerId: string): Promise<MiningAction | null> {
     try {
       // First, let's check if we can access the table at all
-      const { data: testData, error: testError } = await supabase
+      const { error: testError } = await supabase
         .from('mining_actions')
         .select('id')
         .limit(1);

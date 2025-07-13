@@ -7,7 +7,6 @@ import Login from './components/Login';
 import SignUp from './components/SignUp';
 import Dashboard from './components/Dashboard';
 import ErrorBoundary from './components/ErrorBoundary';
-import TestComponent from './components/TestComponent';
 import FactionReputation from './components/FactionReputation';
 import Layout from './components/Layout';
 import StatsPage from './components/StatsPage';

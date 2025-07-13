@@ -5,7 +5,7 @@ import { MiningService } from '../lib/miningService';
 
 const Game: React.FC = () => {
   const { signOut } = useAuth();
-  const { gameState, loading, error, updateGameState } = useGame();
+  const { gameState, loading, error } = useGame();
   
   const [actionInput, setActionInput] = useState('');
 
